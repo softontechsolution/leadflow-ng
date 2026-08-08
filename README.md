@@ -1,3 +1,45 @@
+LeadFlow NG
+
+A lightweight lead-management and follow-up platform for Nigerian businesses.
+
+Our first vertical will be:
+
+LeadFlow NG — Real Estate Edition
+
+But the architecture will allow us to later support:
+
+Real estate
+Hotels
+Clinics
+Schools
+Salons
+Agencies
+Consultants
+Other service businesses
+
+We will not hard-code the application around real estate.
+
+Technology stack
+Layer Technology
+Frontend Next.js 16
+Language TypeScript
+UI shadcn/ui
+Styling Tailwind CSS
+Icons Lucide React
+Forms React Hook Form
+Validation Zod
+Database PostgreSQL
+ORM Prisma 7
+Authentication Better Auth
+Charts Recharts
+Drag & Drop dnd-kit
+Payments Paystack
+WhatsApp WhatsApp Business Cloud API later
+Email Resend later
+Deployment Vercel
+Database hosting Supabase / Neon / Prisma Postgres
+Version control GitHub
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
