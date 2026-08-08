@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -11,6 +6,12 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+/**
+ * |--------------------------------------------------------------------------
+ * | ENUMS
+ * |--------------------------------------------------------------------------
+ */
 
 enum UserRole {
   OWNER
@@ -67,201 +68,331 @@ enum AppointmentStatus {
   NO_SHOW
 }
 
-model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  industry    String?
-  phone       String?
-  whatsapp    String?
-  email       String?
-  address     String?
-  logoUrl     String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-
-  memberships Membership[]
-  leads       Lead[]
-  customers   Customer[]
-  activities  LeadActivity[]
-  followUps   FollowUp[]
-  appointments Appointment[]
-  properties  Property[]
-}
+/**
+ * |--------------------------------------------------------------------------
+ * | BETTER AUTH
+ * |--------------------------------------------------------------------------
+ */
 
 model User {
-  id          String       @id @default(cuid())
-  name        String?
-  email       String       @unique
-  image       String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String   @id @default(cuid())
+  name          String?
+  email         String   @unique
+  emailVerified Boolean  @default(false)
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  memberships Membership[]
-  assignedLeads Lead[]      @relation("AssignedLeads")
-  activities   LeadActivity[]
-  followUps    FollowUp[]
+  /**
+   * | Better Auth relationships
+   */
+  sessions Session[]
+  accounts Account[]
+
+  /**
+   * | LeadFlow relationships
+   */
+  memberships   Membership[]
+  assignedLeads Lead[]         @relation("AssignedLeads")
+  activities    LeadActivity[]
+  followUps     FollowUp[]
 }
 
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id         String @id @default(cuid())
+  accountId  String
+  providerId String
+  userId     String
+
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+/**
+ * |--------------------------------------------------------------------------
+ * | LEADFLOW — MULTI-TENANT ORGANIZATION
+ * |--------------------------------------------------------------------------
+ */
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  industry  String?
+  phone     String?
+  whatsapp  String?
+  email     String?
+  address   String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships  Membership[]
+  leads        Lead[]
+  customers    Customer[]
+  activities   LeadActivity[]
+  followUps    FollowUp[]
+  appointments Appointment[]
+  properties   Property[]
+}
+
+/**
+ * |--------------------------------------------------------------------------
+ * | ORGANIZATION MEMBERSHIP
+ * |--------------------------------------------------------------------------
+ */
+
 model Membership {
-  id             String       @id @default(cuid())
-  role           UserRole     @default(STAFF)
-  createdAt      DateTime     @default(now())
+  id        String   @id @default(cuid())
+  role      UserRole @default(STAFF)
+  createdAt DateTime @default(now())
 
   userId         String
   organizationId String
 
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | LEADS
+ * |--------------------------------------------------------------------------
+ */
+
 model Lead {
-  id             String      @id @default(cuid())
-  firstName      String
-  lastName       String?
-  email          String?
-  phone          String?
-  whatsapp       String?
-  company        String?
-  source         LeadSource  @default(OTHER)
-  status         LeadStatus  @default(NEW)
-  notes          String?
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  id        String     @id @default(cuid())
+  firstName String
+  lastName  String?
+  email     String?
+  phone     String?
+  whatsapp  String?
+  company   String?
+  source    LeadSource @default(OTHER)
+  status    LeadStatus @default(NEW)
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   organizationId String
   assignedToId   String?
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assignedTo     User?        @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignedTo   User?        @relation("AssignedLeads", fields: [assignedToId], references: [id], onDelete: SetNull)
 
-  activities     LeadActivity[]
-  followUps      FollowUp[]
-  appointments   Appointment[]
-  customer       Customer?
+  activities        LeadActivity[]
+  followUps         FollowUp[]
+  appointments      Appointment[]
+  customer          Customer?
   propertyInquiries PropertyInquiry[]
 
   @@index([organizationId])
   @@index([status])
   @@index([assignedToId])
+  @@index([createdAt])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | CUSTOMERS
+ * |--------------------------------------------------------------------------
+ */
+
 model Customer {
-  id             String   @id @default(cuid())
-  firstName      String
-  lastName       String?
-  email          String?
-  phone          String?
-  whatsapp       String?
-  company        String?
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id        String   @id @default(cuid())
+  firstName String
+  lastName  String?
+  email     String?
+  phone     String?
+  whatsapp  String?
+  company   String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   organizationId String
-  leadId         String?  @unique
+  leadId         String? @unique
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
-
-  appointments   Appointment[]
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  appointments Appointment[]
 
   @@index([organizationId])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | LEAD ACTIVITIES
+ * |--------------------------------------------------------------------------
+ */
+
 model LeadActivity {
-  id             String       @id @default(cuid())
-  type           ActivityType
-  description    String
-  createdAt      DateTime     @default(now())
+  id          String       @id @default(cuid())
+  type        ActivityType
+  description String
+  createdAt   DateTime     @default(now())
 
   leadId         String
   userId         String?
   organizationId String
 
-  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  user           User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | FOLLOW UPS
+ * |--------------------------------------------------------------------------
+ */
+
 model FollowUp {
-  id             String         @id @default(cuid())
-  title          String
-  notes          String?
-  scheduledAt    DateTime
-  completedAt    DateTime?
-  status         FollowUpStatus @default(PENDING)
-  createdAt      DateTime       @default(now())
+  id          String         @id @default(cuid())
+  title       String
+  notes       String?
+  scheduledAt DateTime
+  completedAt DateTime?
+  status      FollowUpStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
 
   leadId         String
   userId         String?
   organizationId String
 
-  lead           Lead           @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([scheduledAt])
   @@index([organizationId])
+  @@index([userId])
+  @@index([status])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | APPOINTMENTS
+ * |--------------------------------------------------------------------------
+ */
+
 model Appointment {
-  id             String            @id @default(cuid())
-  title          String
-  description    String?
-  startAt        DateTime
-  endAt          DateTime
-  status         AppointmentStatus @default(SCHEDULED)
-  createdAt      DateTime          @default(now())
+  id          String            @id @default(cuid())
+  title       String
+  description String?
+  startAt     DateTime
+  endAt       DateTime
+  status      AppointmentStatus @default(SCHEDULED)
+  createdAt   DateTime          @default(now())
 
   organizationId String
   leadId         String?
   customerId     String?
 
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  lead           Lead?             @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  customer       Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer     Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   @@index([organizationId])
   @@index([startAt])
+  @@index([status])
+  @@index([leadId])
+  @@index([customerId])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | PROPERTIES
+ * |--------------------------------------------------------------------------
+ */
+
 model Property {
-  id             String   @id @default(cuid())
-  title          String
-  description    String?
-  price          Decimal? @db.Decimal(15, 2)
-  location       String?
-  bedrooms       Int?
-  bathrooms      Int?
-  imageUrl       String?
-  isAvailable    Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  price       Decimal? @db.Decimal(15, 2)
+  location    String?
+  bedrooms    Int?
+  bathrooms   Int?
+  imageUrl    String?
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organizationId String
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  inquiries      PropertyInquiry[]
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  inquiries    PropertyInquiry[]
 
   @@index([organizationId])
+  @@index([isAvailable])
 }
 
+/**
+ * |--------------------------------------------------------------------------
+ * | PROPERTY INQUIRIES
+ * |--------------------------------------------------------------------------
+ */
+
 model PropertyInquiry {
-  id         String   @id @default(cuid())
-  message    String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  message   String?
+  createdAt DateTime @default(now())
 
   leadId     String
   propertyId String
 
-  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
 
   @@unique([leadId, propertyId])
+  @@index([propertyId])
 }
