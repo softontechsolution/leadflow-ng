@@ -93,7 +93,8 @@ model User {
    * | LeadFlow relationships
    */
   memberships   Membership[]
-  assignedLeads Lead[]         @relation("AssignedLeads")
+  invitations   OrganizationInvitation[]
+  assignedLeads Lead[]                   @relation("AssignedLeads")
   activities    LeadActivity[]
   followUps     FollowUp[]
 }
@@ -167,6 +168,7 @@ model Organization {
   updatedAt DateTime @updatedAt
 
   memberships  Membership[]
+  invitations  OrganizationInvitation[]
   leads        Lead[]
   customers    Customer[]
   activities   LeadActivity[]
@@ -195,6 +197,26 @@ model Membership {
   @@unique([userId, organizationId])
   @@index([organizationId])
   @@index([userId])
+}
+
+model OrganizationInvitation {
+  id         String    @id @default(cuid())
+  email      String
+  role       UserRole  @default(STAFF)
+  token      String    @unique
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  organizationId String
+  invitedById    String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([email])
+  @@index([token])
 }
 
 /**

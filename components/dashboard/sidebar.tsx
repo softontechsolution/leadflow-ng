@@ -10,6 +10,7 @@ import {
   CalendarClock,
   CalendarDays,
   Building2,
+  UserPlus,
   Settings,
   X,
 } from "lucide-react";
@@ -26,6 +27,11 @@ const navigation = [
     name: "Leads",
     href: "/dashboard/leads",
     icon: Users,
+  },
+  {
+    name: "Team",
+    href: "/dashboard/team",
+    icon: UserPlus,
   },
   {
     name: "Customers",

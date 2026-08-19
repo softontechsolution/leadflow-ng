@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { authClient } from "@/lib/auth/auth-client";
 
@@ -17,8 +17,38 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+type Invitation = {
+  email: string;
+  role: string;
+  expiresAt: string;
+  organization: {
+    name: string;
+    logoUrl: string | null;
+  };
+  invitedBy: {
+    name: string | null;
+    email: string;
+  };
+};
+
+const roleLabels: Record<string, string> = {
+  OWNER: "Owner",
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  AGENT: "Agent",
+  STAFF: "Staff",
+};
+
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const inviteToken = searchParams.get("invite");
+
+  const [invitation, setInvitation] = useState<Invitation | null>(null);
+  const [loadingInvitation, setLoadingInvitation] = useState(
+    Boolean(inviteToken),
+  );
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,6 +57,45 @@ export default function RegisterPage() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  /*
+   * Load invitation details when registering through an invitation.
+   */
+  useEffect(() => {
+    if (!inviteToken) {
+      setLoadingInvitation(false);
+      return;
+    }
+
+    async function loadInvitation() {
+      try {
+        const response = await fetch(
+          `/api/organizations/invitations/${inviteToken}`,
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Unable to load invitation.");
+        }
+
+        setInvitation(data.invitation);
+
+        /*
+         * Pre-fill the invited email.
+         */
+        setEmail(data.invitation.email);
+      } catch (error) {
+        setError(
+          error instanceof Error ? error.message : "Unable to load invitation.",
+        );
+      } finally {
+        setLoadingInvitation(false);
+      }
+    }
+
+    loadInvitation();
+  }, [inviteToken]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,7 +107,7 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!businessName.trim()) {
+    if (!inviteToken && !businessName.trim()) {
       setError("Please enter your business name.");
       return;
     }
@@ -53,14 +122,31 @@ export default function RegisterPage() {
       return;
     }
 
+    /*
+     * If this is an invitation registration,
+     * make sure the email matches the invitation.
+     */
+    if (
+      invitation &&
+      email.trim().toLowerCase() !== invitation.email.toLowerCase()
+    ) {
+      setError(
+        `This invitation was sent to ${invitation.email}. Please use that email address.`,
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
+      /*
+       * Create the authentication account.
+       */
       const { data, error } = await authClient.signUp.email({
         name: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        callbackURL: "/dashboard",
+        callbackURL: inviteToken ? `/invite/${inviteToken}` : "/dashboard",
       });
 
       if (error) {
@@ -74,9 +160,43 @@ export default function RegisterPage() {
       }
 
       /*
-       * The authentication account has been created successfully.
+       * INVITATION REGISTRATION
        *
-       * We now create the LeadFlow organization and OWNER membership.
+       * Do NOT create a new organization.
+       *
+       * Instead, accept the invitation for the newly
+       * created user.
+       */
+      if (inviteToken) {
+        const acceptResponse = await fetch(
+          `/api/organizations/invitations/${inviteToken}/accept`,
+          {
+            method: "POST",
+          },
+        );
+
+        const acceptData = await acceptResponse.json();
+
+        if (!acceptResponse.ok) {
+          setError(
+            acceptData.error ||
+              "Your account was created, but we could not accept the invitation.",
+          );
+
+          return;
+        }
+
+        router.push("/dashboard");
+        router.refresh();
+
+        return;
+      }
+
+      /*
+       * NORMAL REGISTRATION
+       *
+       * Create a new organization and make this user
+       * the OWNER.
        */
       const organizationResponse = await fetch("/api/organizations", {
         method: "POST",
@@ -108,20 +228,49 @@ export default function RegisterPage() {
     }
   }
 
+  if (loadingInvitation) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <p className="text-sm text-muted-foreground">Loading invitation...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl">
-            Create your LeadFlow account
+            {invitation
+              ? `Join ${invitation.organization.name}`
+              : "Create your LeadFlow account"}
           </CardTitle>
 
           <CardDescription>
-            Start managing your leads, customers and follow-ups in one place.
+            {invitation
+              ? `You've been invited to join ${invitation.organization.name} as a ${
+                  roleLabels[invitation.role] || invitation.role
+                }.`
+              : "Start managing your leads, customers and follow-ups in one place."}
           </CardDescription>
         </CardHeader>
 
         <CardContent>
+          {invitation && (
+            <div className="mb-5 rounded-lg border bg-muted/40 p-4">
+              <p className="text-xs text-muted-foreground">Invitation email</p>
+
+              <p className="mt-1 text-sm font-medium">{invitation.email}</p>
+
+              <p className="mt-2 text-xs text-muted-foreground">
+                Role:{" "}
+                <span className="font-medium text-foreground">
+                  {roleLabels[invitation.role] || invitation.role}
+                </span>
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {error && (
               <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -144,20 +293,22 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="businessName">Business name</Label>
+            {!inviteToken && (
+              <div className="space-y-2">
+                <Label htmlFor="businessName">Business name</Label>
 
-              <Input
-                id="businessName"
-                name="businessName"
-                type="text"
-                placeholder="Acme Realty"
-                value={businessName}
-                onChange={(event) => setBusinessName(event.target.value)}
-                disabled={loading}
-                autoComplete="organization"
-              />
-            </div>
+                <Input
+                  id="businessName"
+                  name="businessName"
+                  type="text"
+                  placeholder="Acme Realty"
+                  value={businessName}
+                  onChange={(event) => setBusinessName(event.target.value)}
+                  disabled={loading}
+                  autoComplete="organization"
+                />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="email">Email address</Label>
@@ -169,9 +320,15 @@ export default function RegisterPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                disabled={loading}
+                disabled={loading || Boolean(invitation)}
                 autoComplete="email"
               />
+
+              {invitation && (
+                <p className="text-xs text-muted-foreground">
+                  This email is locked to the invitation.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -190,13 +347,21 @@ export default function RegisterPage() {
             </div>
 
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating account..." : "Create account"}
+              {loading
+                ? "Creating account..."
+                : invitation
+                  ? "Create Account & Join Team"
+                  : "Create account"}
             </Button>
 
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href={
+                  inviteToken
+                    ? `/login?redirect=/invite/${inviteToken}`
+                    : "/login"
+                }
                 className="font-medium text-primary hover:underline"
               >
                 Sign in

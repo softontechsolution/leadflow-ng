@@ -8,6 +8,7 @@ import { getCurrentOrganization } from "@/lib/auth/organization";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { StatCard } from "@/components/dashboard/stat-card";
+import { FollowUpSummary } from "@/components/dashboard/follow-up-summary";
 
 export default async function DashboardPage() {
   const current = await getCurrentOrganization();
@@ -84,6 +85,7 @@ export default async function DashboardPage() {
         <p className="mt-1 text-muted-foreground">
           Here's what's happening with {current.organization.name}.
         </p>
+        <FollowUpSummary />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

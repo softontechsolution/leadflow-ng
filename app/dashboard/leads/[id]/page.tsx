@@ -14,6 +14,8 @@ import { getCurrentOrganization } from "@/lib/auth/organization";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadStatusSelect } from "@/components/leads/lead-status-select";
+import { FollowUpForm } from "@/components/leads/follow-up-form";
+import { FollowUpActions } from "@/components/leads/follow-up-actions";
 
 const statusLabels: Record<string, string> = {
   NEW: "New",
@@ -327,7 +329,7 @@ export default async function LeadDetailsPage({
               <CardTitle>Follow-ups</CardTitle>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-6">
               {lead.followUps.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No follow-ups scheduled.
@@ -344,10 +346,32 @@ export default async function LeadDetailsPage({
                           timeStyle: "short",
                         }).format(followUp.scheduledAt)}
                       </p>
+
+                      {followUp.notes && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {followUp.notes}
+                        </p>
+                      )}
+
+                      <p className="mt-2 text-xs font-medium">
+                        {followUp.status}
+                      </p>
+                      <FollowUpActions
+                        id={followUp.id}
+                        status={followUp.status}
+                      />
                     </div>
                   ))}
                 </div>
               )}
+
+              <div className="border-t pt-6">
+                <h3 className="mb-4 text-sm font-semibold">
+                  Schedule Follow-up
+                </h3>
+
+                <FollowUpForm leadId={lead.id} />
+              </div>
             </CardContent>
           </Card>
 
