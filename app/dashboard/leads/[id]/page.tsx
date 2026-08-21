@@ -16,6 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LeadStatusSelect } from "@/components/leads/lead-status-select";
 import { FollowUpForm } from "@/components/leads/follow-up-form";
 import { FollowUpActions } from "@/components/leads/follow-up-actions";
+import { AppointmentForm } from "@/components/leads/appointment-form";
+import { AppointmentActions } from "@/components/leads/appointment-actions";
 
 const statusLabels: Record<string, string> = {
   NEW: "New",
@@ -380,7 +382,7 @@ export default async function LeadDetailsPage({
               <CardTitle>Appointments</CardTitle>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="space-y-6">
               {lead.appointments.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No appointments scheduled.
@@ -389,18 +391,54 @@ export default async function LeadDetailsPage({
                 <div className="space-y-3">
                   {lead.appointments.map((appointment) => (
                     <div key={appointment.id} className="rounded-lg border p-3">
-                      <p className="text-sm font-medium">{appointment.title}</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {appointment.title}
+                          </p>
+
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {new Intl.DateTimeFormat("en-NG", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            }).format(appointment.startAt)}
+                          </p>
+                        </div>
+
+                        <span className="rounded-full bg-muted px-2 py-1 text-[11px] font-medium">
+                          {appointment.status.replace("_", " ")}
+                        </span>
+                      </div>
 
                       <p className="mt-1 text-xs text-muted-foreground">
+                        Ends{" "}
                         {new Intl.DateTimeFormat("en-NG", {
-                          dateStyle: "medium",
                           timeStyle: "short",
-                        }).format(appointment.startAt)}
+                        }).format(appointment.endAt)}
                       </p>
+
+                      {appointment.description && (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {appointment.description}
+                        </p>
+                      )}
+
+                      <AppointmentActions
+                        id={appointment.id}
+                        status={appointment.status}
+                      />
                     </div>
                   ))}
                 </div>
               )}
+
+              <div className="border-t pt-6">
+                <h3 className="mb-4 text-sm font-semibold">
+                  Schedule Appointment
+                </h3>
+
+                <AppointmentForm leadId={lead.id} />
+              </div>
             </CardContent>
           </Card>
         </div>

@@ -25,13 +25,9 @@ export async function GET() {
 
         status: "PENDING",
 
-        OR: [
-          {
-            scheduledAt: {
-              lt: endOfToday,
-            },
-          },
-        ],
+        scheduledAt: {
+          lt: endOfToday,
+        },
       },
 
       include: {
